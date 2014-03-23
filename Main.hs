@@ -29,6 +29,17 @@ evalBop Lt     (IntVal v1) (IntVal v2) = BoolVal (v1 < v2)
 evalBop Le     (IntVal v1) (IntVal v2) = BoolVal (v1 <= v2)
 evalBop _      _           _           = defaultVal
 
+-- data Statement =
+--     Assign Variable Expression          
+--   | If Expression Statement Statement
+--   | While Expression Statement       
+--   | Sequence Statement Statement        
+--   | Skip
+--   | Print String Expression
+--   | Throw Expression
+--   | Try Statement Variable Statement
+--   deriving (Show, Eq)
+
 
 type Store    = Map Variable Value
 -- tell str: log in the MonadWriter, update the state?
@@ -37,12 +48,38 @@ evalS :: (MonadState Store m, MonadError Value m, MonadWriter String m) => State
 evalS (Print str _) = do tell str
                          return ()
 
+--   | Skip
+evalS Skip = return ()
+-- Assign Variable Expression 
+--evalS (Assign x e)     = do v <- evalE e
+--                            m <- get
+--                            put $ Map.insert x v m
+evalS (Assign v e) = do x <- evalE e
+                        m <- get
+                        put $ Map.insert v x m
 
 -- evaluate expresion e, see if it throws exception. 
 -- | Throw the exception carrying the value evaluted from expression e
 -- what if it doesn't throw exception?
 evalS (Throw e) = evalE e >>= (\s -> throwError s)
 
+--   | Sequence Statement Statement  
+evalS (Sequence s1 s2) = do evalS s1
+                            evalS s2
+                            return ()
+
+--   | If Expression Statement Statement
+evalS (If e s1 s2) = do b <- evalE e
+                        if b == BoolVal True 
+                             then evalS s1
+                             else evalS s2
+
+--   | While Expression Statement   
+evalS (While e s) = do b <- evalE e
+                       if b == BoolVal True then 
+                          do evalS s
+                             evalS $ While e s
+                          else return ()
 -- 
 -- Try Statement Variable Statement
 -- Try s x h should execute the statement s and if, 
@@ -59,30 +96,38 @@ evalS (Throw e) = evalE e >>= (\s -> throwError s)
 -- how do i track the exception???
 
 
-
+--   | Try Statement Variable Statement
 evalS (Try s x h) = do i <- runErrorT $ evalS s
                        case i of
-                         Left l       -> (evalS h)
-                         Right r      -> return ()
+                         Right _      -> return ()
+                         Left l       -> do _ <- evalS (Assign x (Val l))
+                                            b <- (evalS h) 
+                                            return b
 
-
+-- _ <- evalS (Assign x l)
 --                     Assign x $ Val i
 --                       return ()
 -- evalS _ = error "evals Not Implemented"
  
 
 
+-- data Expression =
+--     Var Variable
+--   | Val Value  
+--   | Op  Bop Expression Expression
 -- evaluate expression?
 evalE :: (MonadState Store m, MonadError Value m, MonadWriter String m) => Expression -> m Value
 -- return?
-eavlE (Var x)        = do s <- get
+evalE (Var x)        = do s <- get
                           return $ s Map.! x
--- return?
+-- eavlE (Var _)        = return defaultVal
+evalE (Val v)        = return v
+-- evalE (Val _)        = return defaultVal
 evalE (Op bop e1 e2) = do s1 <- evalE e1
                           s2 <- evalE e2
                           return $ evalBop bop s1 s2
 -- Multiple declarations of `evalE'
-evalE (Val v)        = return v  
+
 
 -- evalE (Var x)        = do s <- get
 --                           return $ s Map.! x
@@ -99,8 +144,9 @@ evalES = evalS
 execute :: Store -> Statement -> (Store, Maybe Value, String)
 execute s stat = let p1 = (runStateT $ runWriterT (evalES stat)) s
                  in case p1 of
-                      Left v  -> (Map.empty, Just v, "Test")
+                      Left v  -> (Map.empty, Just v, "")
                       Right p -> (snd p, Just (IntVal 3), snd $ fst p)
+
 
 -- pp1 :: Store -> Statement -> Either Value (((), String), Store)
 -- pp1 s stat = (runStateT $ runWriterT (evalES stat)) s
