@@ -15,16 +15,37 @@ import Control.Monad.Writer
 
 import Test.HUnit hiding (State)
 
+> data Statement =
+>     Assign Variable Expression          
+>   | If Expression Statement Statement
+>   | While Expression Statement       
+>   | Sequence Statement Statement        
+>   | Skip
+>   | Print String Expression
+>   | Throw Expression
+>   | Try Statement Variable Statement
+>   deriving (Show, Eq)
+
+
 type Store    = Map Variable Value
 evalS :: (MonadState Store m, MonadError Value m, MonadWriter String m) => Statement -> m ()
-evalS = undefined
+evalS (Assign v e)     = case e of
+                         Var _ -> throwError(IntVal 0)
+                         _     -> undefined 
+evalS (If e s1 s2)     = undefined
+evalS (While e s)      = undefined
+evalS (Sequence s1 s2) = undefined
+evalS (Skip)           = return ()
+evalS (Print s e)      = undefined
+evalS (Throw e)        = undefined
+evalS (Try s1 v s2)    = undefined
  
 -- | 
 -- Updated Store s'
 -- Error: Just Value or Nothing
 -- String: Log
 -- 
-evalE :: Store -> Expression -> (Store, Maybe Value, String) 
+evalE :: MonadState Store m => Expression -> m Value 
 evalE = error "evalE"
  
 
