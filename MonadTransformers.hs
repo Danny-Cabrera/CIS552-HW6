@@ -113,11 +113,41 @@ instance Monad m => MonadTrans MaybeT m where
   lift = MT . lift_ where
     lift_ mt = do x <- mt
                   return $ Just x                
+-- |
+-- Lifting a "null" computation in m yields a "null" computation in t m
+-- where is the null?
+prop_MonadTransReturn :: Int -> Bool
+-- prop_MonadTransReturn x = (lift . return) x == (return :: a -> MaybeT [] a) x
+prop_MonadTransReturn x = (lift . return) x == ((return x) :: MaybeT [] Int)
 
-prop_MonadTransReturn :: Bool
-prop_MonadTransReturn = False
+--prop_MonadTransReturn x = x == return x
 
-prop_MonadTransBind :: Bool
-prop_MonadTransBind = False
- 
+{-
+prop_MonadTransReturn' x = (lift . return_m) x == return_tm x
+	where return_m :: Monad m => a -> m a
+        -- return_m :: a -> [a]
+        return_m = return
+         
+        -- return_tm :: a 
+        -- return_tm :: a -> MaybeT m a
+        return_tm = return
+-}
+
+-- lift ( m a)
+-- (return x) == lift x
+-- lift (m >>=_m k) = lift m >>=_tm (lift . k)
+-- m :: Monad
+-- k :: a -> m b
+-- m >>= k :: m a -> (a -> m b) -> m b
+-- lift (m >>= k) :: t m b
+
+-- lift m :: t m a
+-- lift .k a == lift ( k a)
+-- :: lift (m b) :: t m b
+-- m >>= k :: 
+-- lift m :: t m a
+-- lift .k a :: t m a
+prop_MonadTransBind :: [Char] -> (Char -> [Int]) -> Bool
+prop_MonadTransBind x k = ((lift (x >>= k)) ::  MaybeT [] Int) == ((lift x >>= (lift .k)) ::  MaybeT [] Int)
+-- prop_MonadTransBind = undefined
 

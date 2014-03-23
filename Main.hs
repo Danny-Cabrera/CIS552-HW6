@@ -19,8 +19,12 @@ type Store    = Map Variable Value
 evalS :: (MonadState Store m, MonadError Value m, MonadWriter String m) => Statement -> m ()
 evalS = undefined
  
-
-evalE :: a
+-- | 
+-- Updated Store s'
+-- Error: Just Value or Nothing
+-- String: Log
+-- 
+evalE :: Store -> Expression -> (Store, Maybe Value, String) 
 evalE = error "evalE"
  
 
