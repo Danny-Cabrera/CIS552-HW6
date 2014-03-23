@@ -15,43 +15,116 @@ import Control.Monad.Writer
 
 import Test.HUnit hiding (State)
 
-> data Statement =
->     Assign Variable Expression          
->   | If Expression Statement Statement
->   | While Expression Statement       
->   | Sequence Statement Statement        
->   | Skip
->   | Print String Expression
->   | Throw Expression
->   | Try Statement Variable Statement
->   deriving (Show, Eq)
+
+defaultVal :: Value
+defaultVal = IntVal 0
+evalBop :: Bop -> Value -> Value -> Value
+evalBop Plus   (IntVal v1) (IntVal v2) = IntVal (v1 + v2)
+evalBop Times  (IntVal v1) (IntVal v2) = IntVal (v1 * v2)
+evalBop Minus  (IntVal v1) (IntVal v2) = IntVal (v1 - v2)
+evalBop Divide (IntVal v1) (IntVal v2) = IntVal (v1 `div` v2)
+evalBop Gt     (IntVal v1) (IntVal v2) = BoolVal (v1 > v2)
+evalBop Ge     (IntVal v1) (IntVal v2) = BoolVal (v1 >= v2)
+evalBop Lt     (IntVal v1) (IntVal v2) = BoolVal (v1 < v2)
+evalBop Le     (IntVal v1) (IntVal v2) = BoolVal (v1 <= v2)
+evalBop _      _           _           = defaultVal
 
 
 type Store    = Map Variable Value
+-- tell str: log in the MonadWriter, update the state?
+-- it's polymorphic?
 evalS :: (MonadState Store m, MonadError Value m, MonadWriter String m) => Statement -> m ()
-evalS (Assign v e)     = case e of
-                         Var _ -> throwError(IntVal 0)
-                         _     -> undefined 
-evalS (If e s1 s2)     = undefined
-evalS (While e s)      = undefined
-evalS (Sequence s1 s2) = undefined
-evalS (Skip)           = return ()
-evalS (Print s e)      = undefined
-evalS (Throw e)        = undefined
-evalS (Try s1 v s2)    = undefined
- 
--- | 
--- Updated Store s'
--- Error: Just Value or Nothing
--- String: Log
+evalS (Print str _) = do tell str
+                         return ()
+
+
+-- evaluate expresion e, see if it throws exception. 
+-- | Throw the exception carrying the value evaluted from expression e
+-- what if it doesn't throw exception?
+evalS (Throw e) = evalE e >>= (\s -> throwError s)
+
 -- 
-evalE :: MonadState Store m => Expression -> m Value 
-evalE = error "evalE"
+-- Try Statement Variable Statement
+-- Try s x h should execute the statement s and if, 
+-- in the course of execution, an exception is thrown, 
+-- then the exception value should be assigned to the variable 
+-- x after which the handler statement h is executed.
+-- 
+-- Check (evalS s): is there exception
+-- if yes, assign 
+-- evalS (Try s x h) = do i <- evalS s
+--                       if exception then do add i
+--                                            evalS h
+--                                    else return ()
+-- how do i track the exception???
+
+
+
+evalS (Try s x h) = do i <- runErrorT $ evalS s
+                       case i of
+                         Left l       -> (evalS h)
+                         Right r      -> return ()
+
+
+--                     Assign x $ Val i
+--                       return ()
+-- evalS _ = error "evals Not Implemented"
  
+
+
+-- evaluate expression?
+evalE :: (MonadState Store m, MonadError Value m, MonadWriter String m) => Expression -> m Value
+-- return?
+eavlE (Var x)        = do s <- get
+                          return $ s Map.! x
+-- return?
+evalE (Op bop e1 e2) = do s1 <- evalE e1
+                          s2 <- evalE e2
+                          return $ evalBop bop s1 s2
+-- Multiple declarations of `evalE'
+evalE (Val v)        = return v  
+
+-- evalE (Var x)        = do s <- get
+--                           return $ s Map.! x
+-- evalE (Op bop e1 e2) = do s1 <- evalE e1
+--                          s2 <- evalE e2
+--                           return $ evalBop bop s1 s2
+
+-- 
+-- evalS stat :: m ()
+-- WriterT String (StateT Int (Either String)) a
+evalES :: Statement -> WriterT String (StateT Store (Either Value)) ()
+evalES = evalS
 
 execute :: Store -> Statement -> (Store, Maybe Value, String)
-execute = undefined
+execute s stat = let p1 = (runStateT $ runWriterT (evalES stat)) s
+                 in case p1 of
+                      Left v  -> (Map.empty, Just v, "Test")
+                      Right p -> (snd p, Just (IntVal 3), snd $ fst p)
 
+-- pp1 :: Store -> Statement -> Either Value (((), String), Store)
+-- pp1 s stat = (runStateT $ runWriterT (evalES stat)) s
+
+-- pp2 :: Store -> Statement -> StateT Store (Either Value) ((), String)
+-- pp2 s stat = runWriterT (evalES stat)
+
+
+-- pp3 :: Store -> Statement -> WriterT String (StateT Store (Either Value)) ()
+-- pp3 s stat =  (evalES stat)
+
+
+-- (Map.empty, Just (IntVal 3), "Test")
+-- let r1 =  do x <- (runStateT (evalS stat)) s
+ --                             x
+  --               in (snd r1, Just (IntVal 3), "Test")
+
+--                  in (r1, Just (IntVal 3), "Test")
+-- execute = undefiend
+
+-- ???
+
+
+---------------------
 raises :: Statement -> Value -> Test
 s `raises` v = case (execute Map.empty s) of
     (_, Just v', _) -> v ~?= v'
