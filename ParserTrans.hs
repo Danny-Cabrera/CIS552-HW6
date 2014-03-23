@@ -2,13 +2,15 @@
 
 module ParserTrans (GenParser, Parser, 
                    getC,
+                   getElement,
                    choose,
                    (<|>),
                    satisfy,
                    doParse,  
+                   eof
                    ) where
 
-import Control.Monad.List
+-- import Control.Monad.List
 import Control.Monad.State
 
 -- newtype GenParser e a = P ([e] -> [(a, [e])])
@@ -53,6 +55,11 @@ getC = P $ do (x : xs) <- get
               put xs
               return x
               
+getElement :: GenParser e e
+getElement = P $ StateT (\es -> case es of
+                                  (x:xs) -> [(x, xs)]
+                                  []     -> []) 
+
 -- | Return the next character if it satisfies the given predicate
 -- (this was called satP in lecture)
 satisfy :: (e -> Bool) -> GenParser e e
@@ -63,8 +70,37 @@ satisfy p = do x <- getC
 -- GenParser e e is not a Monad
 -- what's the type of x
 -- ?????
+-- newtype GenericParser s a = GP { unGP :: StateT [s] [] a }
+-- runStateT ::
+-- f :: (a -> m b)
+-- GenParser e a
+
 instance Monad (GenParser e) where
+-- ???
+    return x    =  P $ return x
+    (P p) >>= f = P $ (StateT (\cs -> do (a,cs') <- (runStateT p) cs 
+                                         doParse (f a) cs')) 
+    fail _     = P $ StateT (\_ ->  [ ] ) 
 --  return x = return x
+
+{-
+instance Monad Parser where
+   p1 >>= fp2 = P (\cs -> do (a,cs') <- doParse p1 cs 
+                             doParse (fp2 a) cs') 
+
+   return x   = P (\cs -> [ (x, cs) ])
+
+   fail _     = P (\_ ->  [ ] )
+instance Monad (GenericParser e) where
+  -- p1 >>= fp2 = GP $ StateT (\cs -> do (a, cs') <- doParse p1 cs
+  --                                    doParse (fp2 a) cs')
+  (GP x) >>= f = GP $ x >>= (unGP . f)
+
+  return x = GP $ return x
+
+  --return x   = GP $ StateT (\cs -> [ (x, cs) ])
+  fail _     = GP $ StateT (\_ ->  [ ] )
+-}
 
 --instance Monad (GenericParser e) where
 --   p1 >>= fp2 = P (\cs -> do (a,cs') <- doParse p1 cs 
@@ -73,7 +109,6 @@ instance Monad (GenParser e) where
 --   return x   = P (\cs -> [ (x, cs) ])
 
 --   fail _     = P (\_ ->  [ ] )
-
 
 
 -- choose :: GenericParser e a -> GenericParser e a -> GenericParser e a
