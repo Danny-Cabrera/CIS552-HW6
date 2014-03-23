@@ -1,5 +1,10 @@
-{-# LANGUAGE FlexibleInstances, FlexibleContexts, MultiParamTypeClasses #-}
+-- Advanced Programming, HW 5
+-- by Daniel Cabrera, dcabrera
+--    Hangfei Lin, hangfei
 
+
+{-# LANGUAGE FlexibleInstances, FlexibleContexts, MultiParamTypeClasses #-}
+   
 module MonadTransformers where
  
 import Prelude hiding (Maybe, Just, Nothing)
@@ -42,11 +47,6 @@ newtype MaybeT m a = MT { unMT :: m (Maybe a) }
 
 instance Monad m => Monad (MaybeT m) where
   return x = MT $ return $ Just x
-  -- x :: m (Maybe a)
-  -- ea :: (Maybe a)
-  -- f :: a -> MaybeT m a
-  -- f a :: MaybeT m a
-  -- unMT $ f a :: m (Maybe a) 
   MT x >>= f = MT $ do ea <- x  
                        case ea of 
                          Nothing -> return Nothing
@@ -67,11 +67,6 @@ qc_MaybeT :: IO ()
 qc_MaybeT = quickCheck (prop_Monad :: Char -> MaybeT [] Char ->
                                          Fun Char (MaybeT [] Int) ->
                                          Fun Int (MaybeT [] String) -> Bool)
--- qc_MaybeT = error "Implement qc_MaybeT"
-
--- qc_Maybe = quickCheck (prop_Monad :: Char -> Maybe Char ->
---                                     Fun Char (Maybe Int) ->
---                                     Fun Int (Maybe String) -> Bool)
 
 
 -- | 
@@ -85,7 +80,6 @@ instance Monad m => Monad (MaybeW m) where
   -- (>>=) :: Maybe (m a) -> (a -> Maybe (m b)) -> Maybe (m b)
   -- MW (Just x) >>= f = ??
   MW (Just _x) >>= f = MW Nothing
-
 
 
 instance Eq a => Eq (MaybeW [] a) where
@@ -104,7 +98,6 @@ qc_MaybeW = quickCheck (prop_Monad :: Char -> MaybeW [] Char ->
                                       Fun Int (MaybeW [] String) -> Bool)
 
 
-
 -- Part3
 class (Monad m, Monad (t m)) => MonadTrans t m where
   lift :: Monad m => m a -> t m a
@@ -112,42 +105,14 @@ class (Monad m, Monad (t m)) => MonadTrans t m where
 instance Monad m => MonadTrans MaybeT m where
   lift = MT . lift_ where
     lift_ mt = do x <- mt
-                  return $ Just x                
--- |
+                  return $ Just x  
+              
+-- | prop_MonadTransReturn
 -- Lifting a "null" computation in m yields a "null" computation in t m
--- where is the null?
 prop_MonadTransReturn :: Int -> Bool
--- prop_MonadTransReturn x = (lift . return) x == (return :: a -> MaybeT [] a) x
 prop_MonadTransReturn x = (lift . return) x == ((return x) :: MaybeT [] Int)
 
---prop_MonadTransReturn x = x == return x
-
-{-
-prop_MonadTransReturn' x = (lift . return_m) x == return_tm x
-	where return_m :: Monad m => a -> m a
-        -- return_m :: a -> [a]
-        return_m = return
-         
-        -- return_tm :: a 
-        -- return_tm :: a -> MaybeT m a
-        return_tm = return
--}
-
--- lift ( m a)
--- (return x) == lift x
--- lift (m >>=_m k) = lift m >>=_tm (lift . k)
--- m :: Monad
--- k :: a -> m b
--- m >>= k :: m a -> (a -> m b) -> m b
--- lift (m >>= k) :: t m b
-
--- lift m :: t m a
--- lift .k a == lift ( k a)
--- :: lift (m b) :: t m b
--- m >>= k :: 
--- lift m :: t m a
--- lift .k a :: t m a
-prop_MonadTransBind :: [Char] -> (Char -> [Int]) -> Bool
-prop_MonadTransBind x k = ((lift (x >>= k)) ::  MaybeT [] Int) == ((lift x >>= (lift .k)) ::  MaybeT [] Int)
--- prop_MonadTransBind = undefined
-
+-- | prop_MonadTransBind
+-- Lifting a sequence of computations is the same as lifting them individually
+prop_MonadTransBind :: [Char] -> Fun Char [Char] -> Bool
+prop_MonadTransBind x (Fun _ f) = ((lift (x >>= f)) ::  MaybeT [] Char) == ((lift x >>= (lift .f)) ::  MaybeT [] Char)
